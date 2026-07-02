@@ -1,5 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+"use client";
+
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import Lenis from 'lenis';
+import Image from 'next/image';
 
 interface KreaImage {
   id: string;
@@ -9,16 +12,43 @@ interface KreaImage {
   height?: number;
 }
 
-// Convert full-res PNG URL to optimized WebP/AVIF thumbnail via Vercel Native Image Optimizer
-// Falls back to original URL in local Vite dev environment.
-const getThumbnailUrl = (originalUrl: string): string => {
-  if (import.meta.env.DEV) {
-    return originalUrl;
-  }
-  return `/_vercel/image?url=${encodeURIComponent(originalUrl)}&w=640&q=75`;
-};
+// The CSS .image-card class handles the dark shimmer loading state, so we don't need a Next.js blur placeholder.
+const ImageCard = memo(({ img, index, onSelect }: { img: KreaImage; index: number; onSelect: (img: KreaImage) => void }) => {
+  return (
+    <a
+      href={img.image_url}
+      className="image-card-link"
+      target="_blank"
+      rel="noreferrer"
+      onClick={(e) => {
+        e.preventDefault();
+        onSelect(img);
+      }}
+      title={img.prompt || 'Krea Image'}
+    >
+      <div className="image-card-wrapper" style={{ position: 'relative' }}>
+        <Image
+          src={img.image_url}
+          alt={img.prompt || 'Krea Image'}
+          width={640}
+          height={img.width && img.height ? Math.round(640 * (img.height / img.width)) : 640}
+          className="image-card"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+          quality={75}
+          priority={index < 12}
+          style={{ width: '100%', height: 'auto', display: 'block' }}
+        />
+        {img.prompt && (
+          <div className="prompt-overlay">
+            <p className="prompt-text-overlay">{img.prompt}</p>
+          </div>
+        )}
+      </div>
+    </a>
+  );
+});
 
-function App() {
+export default function GalleryPage() {
   const [images, setImages] = useState<KreaImage[]>([]);
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
@@ -269,39 +299,13 @@ function App() {
         <div className="flex-masonry">
           {columns.map((col, colIdx) => (
             <div key={colIdx} className="masonry-column">
-              {col.map((img) => (
-                <a
-                  href={img.image_url}
-                  key={img.id}
-                  className="image-card-link"
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={(e) => {
-                    // Allow middle clicks (button 1) or modified clicks (Ctrl, Cmd, Shift) to open natively in new tab.
-                    // Otherwise, catch left click to display in-app popup modal.
-                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button !== 1) {
-                      e.preventDefault();
-                      setSelected(img);
-                    }
-                  }}
-                >
-                  <div
-                    className="image-card"
-                    style={{ aspectRatio: img.width && img.height ? `${img.width} / ${img.height}` : 'auto' }}
-                  >
-                    <img
-                      src={getThumbnailUrl(img.image_url)}
-                      alt={img.prompt?.slice(0, 50) || 'Krea Image'}
-                      decoding="async"
-                      style={{ width: '100%', height: 'auto', display: 'block' }}
-                    />
-                    {img.prompt && (
-                      <div className="prompt-overlay">
-                        <p className="prompt-text-overlay">{img.prompt}</p>
-                      </div>
-                    )}
-                  </div>
-                </a>
+              {col.map((img, rowIdx) => (
+                <ImageCard 
+                  key={img.id} 
+                  img={img} 
+                  index={rowIdx * 4 + colIdx} 
+                  onSelect={setSelected} 
+                />
               ))}
             </div>
           ))}
@@ -393,5 +397,3 @@ function App() {
     </div>
   );
 }
-
-export default App;
