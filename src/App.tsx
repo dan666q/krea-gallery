@@ -163,8 +163,8 @@ function App() {
 
   const handleIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
     if (entries[0].isIntersecting && hasMoreRef.current && !loadingRef.current) {
-      // Scroll trigger: 2 parallel API calls (80 images per scroll trigger)
-      fetchMultipleBatches(offsetRef.current, 2);
+      // Scroll trigger: 4 parallel API calls (160 images per scroll trigger) to ensure a massive runway
+      fetchMultipleBatches(offsetRef.current, 4);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -172,7 +172,7 @@ function App() {
   useEffect(() => {
     const observer = new IntersectionObserver(handleIntersect, {
       root: null, // viewport
-      rootMargin: '0px 0px 2500px 0px', // trigger 2500px BEFORE sentinel enters viewport
+      rootMargin: '0px 0px 8000px 0px', // trigger a massive 8000px BEFORE sentinel enters viewport
       threshold: 0,
     });
 
