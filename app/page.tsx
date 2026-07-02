@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import Lenis from 'lenis';
 import Image from 'next/image';
 
@@ -10,6 +10,7 @@ interface KreaImage {
   prompt?: string;
   width?: number;
   height?: number;
+  color?: string;
 }
 
 // The CSS .image-card class handles the dark shimmer loading state, so we don't need a Next.js blur placeholder.
@@ -26,14 +27,14 @@ const ImageCard = memo(({ img, index, onSelect }: { img: KreaImage; index: numbe
       }}
       title={img.prompt || 'Krea Image'}
     >
-      <div className="image-card-wrapper" style={{ position: 'relative' }}>
+      <div className="image-card-wrapper" style={{ position: 'relative', backgroundColor: img.color || '#1a1a1a' }}>
         <Image
           src={img.image_url}
           alt={img.prompt || 'Krea Image'}
           width={640}
           height={img.width && img.height ? Math.round(640 * (img.height / img.width)) : 640}
           className="image-card"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           quality={75}
           priority={index < 12}
           style={{ width: '100%', height: 'auto', display: 'block' }}
@@ -47,6 +48,8 @@ const ImageCard = memo(({ img, index, onSelect }: { img: KreaImage; index: numbe
     </a>
   );
 });
+
+ImageCard.displayName = 'ImageCard';
 
 export default function GalleryPage() {
   const [images, setImages] = useState<KreaImage[]>([]);
@@ -65,8 +68,19 @@ export default function GalleryPage() {
   const seenIds = useRef<Set<string>>(new Set());
 
   const limit = 40;
-
   const [numColumns, setNumColumns] = useState<number>(4);
+
+  const filteredImages = useMemo(() => {
+    if (!searchTerm) return images;
+    const lower = searchTerm.toLowerCase();
+    return images.filter(img => img.prompt?.toLowerCase().includes(lower));
+  }, [images, searchTerm]);
+
+  const columns = useMemo(() => {
+    const cols = Array.from({ length: numColumns }, (): KreaImage[] => []);
+    filteredImages.forEach((img, i) => cols[i % numColumns].push(img));
+    return cols;
+  }, [filteredImages, numColumns]);
 
   // Responsive columns listener
   useEffect(() => {
@@ -99,6 +113,10 @@ export default function GalleryPage() {
       infinite: false,
     });
 
+    lenis.on('scroll', ({ scroll }: { scroll: number }) => {
+      setShowBackToTop(scroll > 800);
+    });
+
     function raf(time: number) {
       lenis.raf(time);
       requestAnimationFrame(raf);
@@ -111,55 +129,68 @@ export default function GalleryPage() {
     };
   }, []);
 
-  // Back-to-Top visibility logic
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 800) {
-        setShowBackToTop(true);
-      } else {
-        setShowBackToTop(false);
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
   // Low-level: fetch a single batch (returns raw data, no state mutations)
-  const fetchBatch = async (batchOffset: number): Promise<KreaImage[]> => {
+  const fetchBatch = useCallback(async (batchOffset: number): Promise<KreaImage[]> => {
     const res = await fetch(
       `/api/k2-feed?itemOffset=${Math.floor(batchOffset)}&limit=${limit}&sort=random&bangers=true&staffPicksFirstPage=true`
     );
     if (!res.ok) throw new Error(`HTTP Error Status: ${res.status}`);
     const data = await res.json();
     return Array.isArray(data) ? data : [];
-  };
+  }, []);
+
+  const prefetchNext = useCallback((nextOffset: number) => {
+    fetchBatch(nextOffset)
+      .then((newImages) => {
+        const uniqueNew = newImages.filter(img => {
+          if (seenIds.current.has(img.id)) return false;
+          seenIds.current.add(img.id);
+          return true;
+        });
+        if (uniqueNew.length > 0) setImages(prev => [...prev, ...uniqueNew]);
+      })
+      .catch(() => {});
+  }, [fetchBatch]);
 
   // High-level: fetch N batches in parallel (like Krea.ai does)
   const fetchMultipleBatches = async (startOffset: number, batchCount: number) => {
     if (loading) return;
     setLoading(true);
 
+    const currentCount = batchCount;
+
     try {
-      // Fire N API calls simultaneously
-      const promises = Array.from({ length: batchCount }, (_, i) =>
-        fetchBatch(startOffset + i * limit)
+      let lastBatchCount = limit;
+
+      // Stream updates: fire N API calls and update state the moment EACH one finishes
+      const promises = Array.from({ length: currentCount }, (_, i) =>
+        fetchBatch(startOffset + i * limit).then((newImages) => {
+
+          const uniqueNew = newImages.filter(img => {
+            if (seenIds.current.has(img.id)) return false;
+            seenIds.current.add(img.id);
+            return true;
+          });
+
+          setImages(prev => [...prev, ...uniqueNew]);
+
+          if (newImages.length < limit / 2) {
+            lastBatchCount = newImages.length;
+          }
+        }).catch(err => console.error("Lỗi ở 1 luồng tải:", err))
       );
-      const results = await Promise.all(promises);
-      const allNew = results.flat();
 
-      // Filter out duplicates
-      const uniqueNew = allNew.filter(img => {
-        if (seenIds.current.has(img.id)) return false;
-        seenIds.current.add(img.id);
-        return true;
-      });
-      
-      setImages(prev => [...prev, ...uniqueNew]);
-      setOffset(startOffset + batchCount * limit);
+      // Wait for all streams to finish just to release the loading lock
+      await Promise.all(promises);
 
-      // Stop loading if the last batch returned less than half of the requested limit
-      const lastBatch = results[results.length - 1];
-      setHasMore(lastBatch.length >= limit / 2);
+      const nextOffset = startOffset + currentCount * limit;
+      setOffset(nextOffset);
+      setHasMore(lastBatchCount > limit / 2);
+
+      // Prefetch silent — không block UI, không setLoading
+      if (lastBatchCount > limit / 2) {
+        prefetchNext(nextOffset);
+      }
     } catch (err) {
       console.error("Lỗi khi tải danh sách ảnh Krea:", err);
     } finally {
@@ -167,9 +198,14 @@ export default function GalleryPage() {
     }
   };
 
-  // Initial fetch: 2 parallel API calls (80 images)
+  // Track how many batches to fetch simultaneously, scaling up as user scrolls deeper
+  const batchMultiplierRef = useRef(1);
+
+  // Initial fetch: 1 batch (40 images) to get first paint as fast as possible
   useEffect(() => {
-    fetchMultipleBatches(0, 2);
+    fetchMultipleBatches(0, batchMultiplierRef.current);
+    // Prepare for next scroll
+    batchMultiplierRef.current = 2;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -186,8 +222,14 @@ export default function GalleryPage() {
 
   const handleIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
     if (entries[0].isIntersecting && hasMoreRef.current && !loadingRef.current) {
-      // Scroll trigger: 2 parallel API calls (80 images)
-      fetchMultipleBatches(offsetRef.current, 2);
+      // Scroll trigger: dynamically increasing parallel API calls (40, 80, 120...)
+      const currentMultiplier = batchMultiplierRef.current;
+      fetchMultipleBatches(offsetRef.current, currentMultiplier);
+
+      // Tăng ở đây, KHÔNG tăng trong fetchMultipleBatches
+      if (batchMultiplierRef.current < 4) {
+        batchMultiplierRef.current += 1;
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -195,7 +237,7 @@ export default function GalleryPage() {
   useEffect(() => {
     const observer = new IntersectionObserver(handleIntersect, {
       root: null, // viewport
-      rootMargin: '0px 0px 2000px 0px', // trigger 2000px BEFORE sentinel enters viewport
+      rootMargin: '0px 0px 2500px 0px', // trigger 2500px BEFORE sentinel enters viewport
       threshold: 0,
     });
 
@@ -208,28 +250,17 @@ export default function GalleryPage() {
     };
   }, [handleIntersect]);
 
-  // Filter images locally based on prompt search term
-  const filteredImages = images.filter(img =>
-    img.prompt ? img.prompt.toLowerCase().includes(searchTerm.toLowerCase()) : false
-  );
-
-  // Partition images into columns for smooth rendering without layout jumping
-  const columns = Array.from({ length: numColumns }, () => [] as KreaImage[]);
-  filteredImages.forEach((img, idx) => {
-    columns[idx % numColumns].push(img);
-  });
-
 
   // Copy prompt text to clipboard
-  const handleCopyPrompt = (text: string) => {
+  const handleCopyPrompt = useCallback((text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       setShowToast(true);
       setTimeout(() => setShowToast(false), 2000);
     });
-  };
+  }, []);
 
   // Safe direct download of image bypass CORS
-  const handleDownload = async (url: string, id: string) => {
+  const handleDownload = useCallback(async (url: string, id: string) => {
     if (downloading) return;
     setDownloading(true);
 
@@ -253,7 +284,7 @@ export default function GalleryPage() {
     } finally {
       setDownloading(false);
     }
-  };
+  }, [downloading]);
 
   // Smooth scroll to top helper
   const scrollToTop = () => {
@@ -300,11 +331,11 @@ export default function GalleryPage() {
           {columns.map((col, colIdx) => (
             <div key={colIdx} className="masonry-column">
               {col.map((img, rowIdx) => (
-                <ImageCard 
-                  key={img.id} 
-                  img={img} 
-                  index={rowIdx * 4 + colIdx} 
-                  onSelect={setSelected} 
+                <ImageCard
+                  key={img.id}
+                  img={img}
+                  index={rowIdx * 4 + colIdx}
+                  onSelect={setSelected}
                 />
               ))}
             </div>

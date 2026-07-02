@@ -10,7 +10,12 @@ export async function GET(request: Request) {
 
   const targetUrl = `https://www.krea.ai/api/k2-feed?itemOffset=${itemOffset}&limit=${limit}&sort=${sort}&bangers=${bangers}&staffPicksFirstPage=${staffPicksFirstPage}`;
 
+  let timeout: NodeJS.Timeout | undefined;
+
   try {
+    const controller = new AbortController();
+    timeout = setTimeout(() => controller.abort(), 8000);
+
     const headers: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'application/json',
@@ -24,6 +29,7 @@ export async function GET(request: Request) {
     const response = await fetch(targetUrl, {
       method: 'GET',
       headers,
+      signal: controller.signal
     });
 
     if (!response.ok) {
@@ -39,18 +45,31 @@ export async function GET(request: Request) {
       ? data.map((img: any) => ({
         id: img.id,
         image_url: img.image_url,
-        prompt: img.prompt ? (img.prompt.length > 150 ? img.prompt.substring(0, 150) + '...' : img.prompt) : '',
+        prompt: img.prompt || '',
         width: img.width,
-        height: img.height
+        height: img.height,
+        color: img.metadata?.dominant_color || '#1a1a1a'
       }))
       : [];
 
-    return NextResponse.json(cleanData);
+    const cacheHeaders = cookie
+      ? { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
+      : {
+          'Cache-Control': 's-maxage=60, stale-while-revalidate=300',
+          'X-Content-Type-Options': 'nosniff',
+        };
+
+    return NextResponse.json(cleanData, { headers: cacheHeaders });
   } catch (error: any) {
+    if (error.name === 'AbortError') {
+      return NextResponse.json({ error: 'Request timeout' }, { status: 504 });
+    }
     console.error('Serverless Proxy Error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal Server Error' },
       { status: 500 }
     );
+  } finally {
+    clearTimeout(timeout);
   }
 }

@@ -233,20 +233,19 @@ html.lenis {
   break-inside: avoid;
 }
 
+.image-card-wrapper {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 420px;
+}
+
 .image-card {
   position: relative;
-  background: linear-gradient(110deg, #121214 8%, #1f1f23 18%, #121214 33%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite linear;
+  background-color: transparent; /* Allow wrapper's dominant_color to show through */
   border: none; /* Borderless for flush styling */
   border-radius: 0; /* Remove rounded corners */
   overflow: hidden;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  
-  /* CSS Virtual Rendering Magic */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 400px; 
 }
 
 .image-card::after {
