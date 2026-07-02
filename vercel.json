@@ -1,0 +1,7 @@
+{
+  "images": {
+    "sizes": [640, 1080],
+    "domains": ["gen.krea.ai"],
+    "formats": ["image/avif", "image/webp"]
+  }
+}

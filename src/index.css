@@ -1,0 +1,601 @@
+/* Global Variables & Design Tokens */
+:root {
+  --bg-primary: #030303;
+  --bg-secondary: #09090b;
+  --bg-card: rgba(20, 20, 23, 0.6);
+  --bg-modal: rgba(15, 15, 18, 0.95);
+  
+  --border-color: rgba(39, 39, 42, 0.6);
+  --border-focus: rgba(251, 146, 60, 0.4); /* Neon accent */
+  
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #52525b;
+  
+  --accent: #fb923c; /* Warm orange */
+  --accent-glow: rgba(251, 146, 60, 0.15);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --blur-amount: 12px;
+}
+
+/* Reset and Typography */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  scroll-behavior: auto; /* Required for Lenis */
+}
+
+body {
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, .brand-title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* Lenis Specific Configuration */
+html.lenis {
+  height: auto;
+}
+
+.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+  border: 2px solid var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Layout Header (Glassmorphism Sticky) */
+.header-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(3, 3, 3, 0.7);
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border-bottom: 1px solid var(--border-color);
+  padding: 1.25rem 2rem;
+  transition: all 0.3s ease;
+}
+
+.header-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .header-container {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-logo {
+  width: 2.25rem;
+  height: 2.25rem;
+  background: linear-gradient(135deg, #f97316 0%, #d97706 100%);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 1.25rem;
+  box-shadow: 0 0 15px rgba(249, 115, 22, 0.4);
+}
+
+.brand-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(to right, #ffffff, #a1a1aa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Search and Metadata Controls */
+.controls-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .controls-section {
+    width: auto;
+  }
+}
+
+.search-input-wrapper {
+  position: relative;
+  flex-grow: 1;
+  max-width: 400px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  background: rgba(20, 20, 23, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 9999px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 15px var(--accent-glow);
+  background: rgba(10, 10, 12, 0.9);
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.stats-badge {
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(251, 146, 60, 0.1);
+  border: 1px solid rgba(251, 146, 60, 0.2);
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+/* Main Layout Grid (Masonry using CSS columns) */
+.main-content {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.flex-masonry {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  gap: 0;
+}
+
+.masonry-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Image Card Styles */
+.image-card-link {
+  display: block;
+  text-decoration: none;
+  margin-bottom: 0; /* Remove vertical gap */
+  padding: 0;
+  break-inside: avoid;
+}
+
+.image-card {
+  position: relative;
+  background: linear-gradient(110deg, #121214 8%, #1f1f23 18%, #121214 33%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+  border: none; /* Borderless for flush styling */
+  border-radius: 0; /* Remove rounded corners */
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.image-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  border: none;
+  pointer-events: none;
+}
+
+.image-card:hover {
+  /* Cards stay exactly in place when adjacent, zoom happens on image instead */
+  z-index: 10;
+}
+
+.image-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.image-card:hover img {
+  transform: scale(1.04);
+}
+
+/* Prompt Quick Overlay on Hover */
+.prompt-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to top, rgba(3, 3, 3, 0.95) 0%, rgba(3, 3, 3, 0.5) 60%, transparent 100%);
+  padding: 1.5rem 1.25rem 1.25rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.image-card:hover .prompt-overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.prompt-text-overlay {
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-weight: 400;
+}
+
+/* Skeleton Shimmer Loading */
+.skeleton-card {
+  height: 250px;
+  background: linear-gradient(110deg, #121214 8%, #1f1f23 18%, #121214 33%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+@keyframes shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+
+/* Modal Popup Styles (Side-by-Side) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content-container {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  width: 100%;
+  max-width: 1100px;
+  max-height: 90vh;
+  border-radius: 2rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (min-width: 850px) {
+  .modal-body {
+    flex-direction: row;
+    height: 75vh;
+  }
+}
+
+/* Modal Close Button */
+.modal-close-btn {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1.25rem;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+  transform: rotate(90deg);
+}
+
+/* Modal Left Section (Image Preview) */
+.modal-image-section {
+  flex: 1.2;
+  background: #020202;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  min-height: 300px;
+  overflow: hidden;
+}
+
+@media (min-width: 850px) {
+  .modal-image-section {
+    min-height: auto;
+    padding: 2.5rem;
+  }
+}
+
+.modal-image-section img {
+  max-width: 100%;
+  max-height: 50vh;
+  object-contain: contain;
+  border-radius: 1rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  transition: transform 0.3s ease;
+}
+
+@media (min-width: 850px) {
+  .modal-image-section img {
+    max-height: 100%;
+  }
+}
+
+/* Modal Right Section (Details & Prompt) */
+.modal-details-section {
+  flex: 0.8;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  border-top: 1px solid var(--border-color);
+  overflow-y: auto;
+}
+
+@media (min-width: 850px) {
+  .modal-details-section {
+    border-top: none;
+    border-left: 1px solid var(--border-color);
+  }
+}
+
+.modal-header-info {
+  margin-bottom: 1.5rem;
+}
+
+.modal-header-info h4 {
+  font-size: 0.8rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem;
+}
+
+.modal-header-info .image-id {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.prompt-box {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: auto;
+}
+
+.btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #f97316 0%, #d97706 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--text-secondary);
+}
+
+/* Toast Notification (Copy success feedback) */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  z-index: 60;
+  background: #18181b;
+  border: 1px solid var(--accent);
+  color: var(--text-primary);
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: var(--glass-shadow);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Back to Top Floating Button */
+.back-to-top {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 45;
+  background: rgba(20, 20, 23, 0.8);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.8) translateY(10px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--glass-shadow);
+}
+
+.back-to-top.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1) translateY(0);
+}
+
+.back-to-top:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 0 15px rgba(249, 115, 22, 0.4);
+}
+
+/* Loading/End Messages */
+.loader-msg {
+  text-align: center;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  padding: 3rem 0;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.end-msg {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  padding: 3rem 0;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
