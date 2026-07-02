@@ -123,14 +123,7 @@ function App() {
         seenIds.current.add(img.id);
         return true;
       });
-
-      // Preload image files into browser cache immediately (before React renders)
-      // Uses thumbnail URL in production, original URL locally
-      uniqueNew.forEach(img => {
-        const preloader = new Image();
-        preloader.src = getThumbnailUrl(img.image_url);
-      });
-
+      
       setImages(prev => [...prev, ...uniqueNew]);
       setOffset(startOffset + batchCount * limit);
 
@@ -144,9 +137,9 @@ function App() {
     }
   };
 
-  // Initial fetch: 4 parallel API calls (160 images buffer, matches Krea.ai behavior)
+  // Initial fetch: 2 parallel API calls (80 images)
   useEffect(() => {
-    fetchMultipleBatches(0, 4);
+    fetchMultipleBatches(0, 2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -163,8 +156,8 @@ function App() {
 
   const handleIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
     if (entries[0].isIntersecting && hasMoreRef.current && !loadingRef.current) {
-      // Scroll trigger: 4 parallel API calls (160 images per scroll trigger) to ensure a massive runway
-      fetchMultipleBatches(offsetRef.current, 4);
+      // Scroll trigger: 2 parallel API calls (80 images)
+      fetchMultipleBatches(offsetRef.current, 2);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -172,7 +165,7 @@ function App() {
   useEffect(() => {
     const observer = new IntersectionObserver(handleIntersect, {
       root: null, // viewport
-      rootMargin: '0px 0px 8000px 0px', // trigger a massive 8000px BEFORE sentinel enters viewport
+      rootMargin: '0px 0px 2000px 0px', // trigger 2000px BEFORE sentinel enters viewport
       threshold: 0,
     });
 
