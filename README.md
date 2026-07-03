@@ -52,36 +52,34 @@ Luồng này phục vụ hàng triệu người dùng truy cập web xem ảnh, 
 
 ## 3. Kiến Trúc Giao Tiếp API (API Fetching Architecture)
 
-Dự án sử dụng mô hình kiến trúc phân lớp (Client -> Proxy Server -> Cloud Provider) để bảo vệ tuyệt đối các khóa bí mật (Secret Keys) và vượt qua rào cản CORS.
+Dự án sử dụng mô hình kiến trúc phân lớp (Client -> Proxy Server -> Cloud Provider) để bảo vệ các khóa bí mật (Secret Keys) và tối ưu băng thông. Các API được thiết kế chặt chẽ theo 2 luồng dữ liệu chính:
 
-### 3.1. Phía Frontend (Giao tiếp Client ↔ Vercel Server)
-Frontend (chạy trên trình duyệt của người dùng) tuyệt đối **KHÔNG** giao tiếp trực tiếp với Cloudflare hay Krea để tránh lộ Token. Thay vào đó, nó gọi các API nội bộ (Route Handlers) của Next.js:
+### 3.1. Luồng Thu Thập Dữ Liệu (Scraping/Writing Flow)
+Luồng này diễn ra âm thầm ở hậu trường (Backend), theo thứ tự:
 
-1. **API Lấy danh sách ảnh (`GET /api/images?page=X&limit=40`):** 
-   - Trả về mảng JSON thuần chứa thông tin ảnh.
-   - Ứng dụng kỹ thuật *Streaming Parallel Fetch* như đã giải thích ở phần dưới.
-2. **API Lấy ảnh tương tự (`GET /api/k2-similar?id=X`):** 
-   - Trả về JSON ảnh phong cách giống nhau (Real-time proxy).
-3. **API Tải ảnh Full-Res (`GET /api/image-download?url=R2_URL`):** 
-   - Vượt lỗi CORS khi tải file từ tên miền R2. Server sẽ kéo file dưới dạng Blob và trả về kèm Header `Content-Disposition: attachment` (hoặc Client xử lý Blob nội bộ) để ép trình duyệt lưu file thành công thay vì mở tab mới.
+1. **Giao tiếp với Krea.ai (Mạo danh Trình duyệt):**
+   - Máy chủ Vercel sử dụng hàm `fetch()` gọi vào API của Krea (`/api/k2-feed`).
+   - Truyền biến `KREA_SESSION_COOKIE` vào Header `Cookie` kết hợp với `User-Agent` chuẩn để đánh lừa Krea rằng đây là một người dùng hợp lệ, từ đó lấy được cục JSON metadata và file ảnh gốc mà không bị chặn.
+2. **Giao tiếp với Cloudflare R2 (Lưu trữ ảnh):**
+   - Sau khi có file ảnh gốc, Vercel Server dùng chuẩn API siêu nhẹ `aws4fetch` để ký xác thực bảo mật AWS Signature V4.
+   - Gửi request `PUT` đẩy thẳng file nhị phân vào vùng lưu trữ R2 riêng tư.
+3. **Giao tiếp với Cloudflare D1 (Lưu trữ thông tin):**
+   - Không dùng thư viện ORM cồng kềnh, Vercel Server gọi thẳng **D1 REST API** tiêu chuẩn của Cloudflare.
+   - Gửi request `POST` đính kèm `Authorization: Bearer <D1_API_TOKEN>`.
+   - Body chứa câu lệnh SQL thô và các tham số (`?`) để lưu trữ ID, Prompt, URL an toàn chống SQL Injection tuyệt đối.
 
-### 3.2. Phía Cloud (Giao tiếp Vercel Server ↔ Cloudflare / Krea)
-Đây là nơi diễn ra các thao tác "hạng nặng". Máy chủ Vercel đóng vai trò cầu nối, sử dụng các chuẩn giao tiếp sau:
+### 3.2. Luồng Hiển Thị Giao Diện (Serving/Reading Flow)
+Luồng này phục vụ người dùng cuối (Frontend) với mục tiêu tốc độ bàn thờ và 0đ băng thông:
 
-1. **Giao tiếp với Cloudflare D1 (Database):**
-   - Không dùng thư viện ORM cồng kềnh, hệ thống gọi thẳng **D1 REST API** của Cloudflare bằng hàm `fetch()` tiêu chuẩn.
-   - **Endpoint:** `https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/d1/database/<DB_ID>/query` (Method: `POST`).
-   - **Headers:** Gắn kèm `Authorization: Bearer <D1_API_TOKEN>`.
-   - **Body:** Đóng gói câu lệnh SQL thô và mảng tham số (`?`) để chống SQL Injection tuyệt đối.
-
-2. **Giao tiếp với Cloudflare R2 (Storage):**
-   - **Khi Tải ảnh lên (Write/Upload):** Sử dụng chuẩn API siêu nhẹ `aws4fetch` để ký xác thực bảo mật AWS Signature V4. Ảnh được đẩy thẳng vào vùng lưu trữ R2 thông qua phương thức `PUT`.
-   - **Khi Trình duyệt hiển thị (Read):** Không cần thông qua Vercel. Client tải trực tiếp file từ hệ thống mạng lưới CDN công cộng (Public Bucket) của R2 thông qua biến `R2_PUBLIC_URL`, mang lại **Egress băng thông 0 đồng**.
-
-3. **Giao tiếp ngược về Krea.ai (Scraping & Proxy):**
-   - Sử dụng phương thức mạo danh trình duyệt (Impersonation).
-   - Truyền biến môi trường `KREA_SESSION_COOKIE` vào Header `Cookie` kết hợp với `User-Agent` chuẩn của Google Chrome.
-   - Krea API sẽ lầm tưởng máy chủ Vercel của chúng ta là một người dùng thật đang lướt web hợp lệ và nhả dữ liệu JSON (hoặc file gốc) mà không hề nghi ngờ.
+1. **Frontend gọi API Nội Bộ (Vercel Server):**
+   - Trình duyệt tuyệt đối KHÔNG giao tiếp thẳng với Cloudflare hay Krea để tránh lộ Token. Nó chỉ gọi hàm `GET /api/images?page=X` (Next.js Route Handler).
+2. **Vercel Server truy vấn Cloudflare D1:**
+   - Server nhận lệnh, dịch thành câu SQL (`SELECT ... OFFSET ... LIMIT`), chọc vào D1 REST API để lấy danh sách URL ảnh siêu nhanh. Trả ngược JSON về cho Frontend.
+3. **Frontend nạp ảnh trực tiếp từ Cloudflare R2 (Bypass Server):**
+   - Client lấy được URL ảnh (`R2_PUBLIC_URL`). Thay vì bắt Server tải ảnh về, Client gọi (load) ảnh trực tiếp từ hệ thống mạng lưới CDN công cộng của R2. Điều này giải phóng hoàn toàn băng thông cho máy chủ Vercel và mang lại **Egress 0 đồng** từ Cloudflare.
+4. **Các tính năng nâng cao (Proxy API):**
+   - **Tải ảnh Full-Res:** Khi bấm nút Download, Client gọi `/api/image-download?url=R2_URL`. Server sẽ kéo file từ R2 về dưới dạng Blob và gắn Header `Content-Disposition: attachment` để ép trình duyệt "Save As..." thành công mà không bị lỗi CORS.
+   - **Ảnh tương tự:** Client gọi `/api/k2-similar?id=X`. Server đóng vai Proxy, chọc ngược về Krea API lấy danh sách ảnh phong cách giống nhau hiển thị dạng Real-time mà không cần lưu rác vào D1/R2.
 
 ---
 
