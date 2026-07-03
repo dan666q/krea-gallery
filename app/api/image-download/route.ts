@@ -5,6 +5,7 @@ const ALLOWED_HOSTNAMES = [
   'imagedelivery.net',
   'cdn.krea.ai',
   'krea.ai',
+  'r2.dev',
 ];
 
 export async function GET(request: Request) {
