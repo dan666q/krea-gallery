@@ -62,6 +62,10 @@ export default function GalleryPage() {
   const [downloading, setDownloading] = useState<boolean>(false);
   const [showToast, setShowToast] = useState<boolean>(false);
   const [showBackToTop, setShowBackToTop] = useState<boolean>(false);
+  
+  // Similar images states
+  const [similarImages, setSimilarImages] = useState<KreaImage[]>([]);
+  const [loadingSimilar, setLoadingSimilar] = useState<boolean>(false);
 
   // Set to filter duplicates
   const seenIds = useRef<Set<string>>(new Set());
@@ -135,6 +139,27 @@ export default function GalleryPage() {
     } else {
       lenisRef.current?.start();
     }
+  }, [selected]);
+
+  // Fetch similar images when a detail view opens
+  useEffect(() => {
+    if (!selected) {
+      setSimilarImages([]);
+      return;
+    }
+    
+    setLoadingSimilar(true);
+    setSimilarImages([]);
+    
+    fetch(`/api/k2-similar?id=${selected.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setSimilarImages(data);
+        }
+      })
+      .catch(err => console.error("Lỗi tải ảnh tương tự:", err))
+      .finally(() => setLoadingSimilar(false));
   }, [selected]);
 
   // Low-level: fetch a single batch (returns raw data, no state mutations)
@@ -370,47 +395,73 @@ export default function GalleryPage() {
               &times;
             </button>
 
-            <div className="modal-body">
-              {/* Left Column: Image Preview */}
-              <div className="modal-image-section">
-                <img src={selected.image_url} alt={selected.prompt || 'Detail preview'} />
-              </div>
-
-              {/* Right Column: Prompt & Actions */}
-              <div className="modal-details-section" data-lenis-prevent>
-                {selected.prompt ? (
-                  <>
-                    <h4 style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>Prompt</h4>
-                    <div className="prompt-box select-all" data-lenis-prevent>
-                      {selected.prompt}
-                    </div>
-                  </>
-                ) : (
-                  <p className="prompt-box text-zinc-500 italic" style={{ fontSize: '0.85rem' }}>
-                    Không tìm thấy dữ liệu prompt cho ảnh này.
-                  </p>
-                )}
-
-                <div className="action-buttons">
-                  {selected.prompt && (
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => handleCopyPrompt(selected.prompt || '')}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                      Copy Prompt
-                    </button>
-                  )}
-
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => handleDownload(selected.image_url, selected.id)}
-                    disabled={downloading}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    {downloading ? 'Đang tải...' : 'Tải Full Resolution'}
-                  </button>
+            <div className="modal-scroll-area" data-lenis-prevent>
+              <div className="modal-body">
+                {/* Left Column: Image Preview */}
+                <div className="modal-image-section">
+                  <img src={selected.image_url} alt={selected.prompt || 'Detail preview'} />
                 </div>
+  
+                {/* Right Column: Prompt & Actions */}
+                <div className="modal-details-section">
+                  {selected.prompt ? (
+                    <>
+                      <h4 style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>Prompt</h4>
+                      <div className="prompt-box select-all">
+                        {selected.prompt}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="prompt-box text-zinc-500 italic" style={{ fontSize: '0.85rem' }}>
+                      Không tìm thấy dữ liệu prompt cho ảnh này.
+                    </p>
+                  )}
+  
+                  <div className="action-buttons">
+                    {selected.prompt && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleCopyPrompt(selected.prompt || '')}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        Copy Prompt
+                      </button>
+                    )}
+  
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => handleDownload(selected.image_url, selected.id)}
+                      disabled={downloading}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      {downloading ? 'Đang tải...' : 'Tải Full Resolution'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Similar Images Section */}
+              <div className="similar-section">
+                <h3 className="similar-title">Ảnh tương tự</h3>
+                {loadingSimilar ? (
+                  <div className="similar-loading">
+                    <svg className="similar-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" strokeOpacity="0.25"></circle>
+                      <path d="M12 2a10 10 0 0 1 10 10" strokeOpacity="1"></path>
+                    </svg>
+                    <span>Đang tìm ảnh cùng phong cách...</span>
+                  </div>
+                ) : similarImages.length > 0 ? (
+                  <div className="similar-grid">
+                    {similarImages.map((img) => (
+                      <div key={img.id} className="similar-item" onClick={() => setSelected(img)}>
+                        <img src={img.image_url} alt={img.prompt || 'Similar'} loading="lazy" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="similar-empty">Không tìm thấy ảnh tương tự.</p>
+                )}
               </div>
             </div>
           </div>

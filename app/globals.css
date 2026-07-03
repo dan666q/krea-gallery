@@ -604,3 +604,105 @@ html.lenis {
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
+
+/* Modal Scroll Area and Similar Grid */
+.modal-scroll-area {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  width: 100%;
+  height: 100%;
+  max-height: 90vh; /* inherit from container */
+}
+
+/* Similar Section */
+.similar-section {
+  padding: 2rem 1.5rem;
+  background: rgba(18, 18, 20, 0.5);
+  border-top: 1px solid var(--border-color);
+}
+@media (min-width: 850px) {
+  .similar-section {
+    padding: 3rem 2.5rem;
+  }
+}
+
+.similar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+.similar-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+@media (min-width: 640px) {
+  .similar-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (min-width: 900px) {
+  .similar-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.similar-item {
+  border-radius: 1rem;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  aspect-ratio: 1;
+  background: #1a1a1a;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.similar-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+  z-index: 2;
+}
+
+.similar-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.similar-item:hover img {
+  transform: scale(1.05);
+}
+
+.similar-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.similar-spinner {
+  width: 2rem;
+  height: 2rem;
+  animation: spin 1s linear infinite;
+  color: #f97316;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.similar-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 3rem 0;
+  font-style: italic;
+}
