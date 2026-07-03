@@ -69,9 +69,11 @@ export default function GalleryPage() {
 
   // Set to filter duplicates
   const seenIds = useRef<Set<string>>(new Set());
+  const prefetchingRef = useRef(false);
 
   const limit = 40;
   const [numColumns, setNumColumns] = useState<number>(4);
+  const SIMILAR_COLS = 2;
 
   // Lenis ref to stop/start when modal opens/closes
   const lenisRef = useRef<Lenis | null>(null);
@@ -83,10 +85,10 @@ export default function GalleryPage() {
   }, [images, numColumns]);
 
   const similarColumns = useMemo(() => {
-    const cols = Array.from({ length: numColumns }, (): KreaImage[] => []);
-    similarImages.forEach((img, i) => cols[i % numColumns].push(img));
+    const cols = Array.from({ length: SIMILAR_COLS }, (): KreaImage[] => []);
+    similarImages.forEach((img, i) => cols[i % SIMILAR_COLS].push(img));
     return cols;
-  }, [similarImages, numColumns]);
+  }, [similarImages]);
 
   // Responsive columns listener
   useEffect(() => {
@@ -179,6 +181,9 @@ export default function GalleryPage() {
   }, []);
 
   const prefetchNext = useCallback((nextOffset: number) => {
+    if (prefetchingRef.current) return;
+    prefetchingRef.current = true;
+
     fetchBatch(nextOffset)
       .then((newImages) => {
         const uniqueNew = newImages.filter(img => {
@@ -188,11 +193,15 @@ export default function GalleryPage() {
         });
         if (uniqueNew.length > 0) setImages(prev => [...prev, ...uniqueNew]);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { prefetchingRef.current = false; });
   }, [fetchBatch]);
 
+  // Track how many batches to fetch simultaneously, scaling up as user scrolls deeper
+  const batchMultiplierRef = useRef(1);
+
   // High-level: fetch N batches in parallel (like Krea.ai does)
-  const fetchMultipleBatches = async (startOffset: number, batchCount: number) => {
+  const fetchMultipleBatches = useCallback(async (startOffset: number, batchCount: number) => {
     if (loading) return;
     setLoading(true);
 
@@ -235,10 +244,7 @@ export default function GalleryPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Track how many batches to fetch simultaneously, scaling up as user scrolls deeper
-  const batchMultiplierRef = useRef(1);
+  }, [fetchBatch, prefetchNext]);
 
   // Initial fetch: 1 batch (40 images) to get first paint as fast as possible
   useEffect(() => {
@@ -465,7 +471,7 @@ export default function GalleryPage() {
                           <ImageCard
                             key={img.id}
                             img={img}
-                            index={rowIdx * numColumns + colIdx}
+                            index={rowIdx * SIMILAR_COLS + colIdx}
                             onSelect={setSelected}
                           />
                         ))}
