@@ -55,8 +55,7 @@ Luồng này phục vụ hàng triệu người dùng truy cập web xem ảnh, 
 Để render một Masonry Grid (lưới ảnh tự do kiểu Pinterest) với hàng vạn tấm ảnh mà trình duyệt không bị giật lag, dự án kết hợp các phương thức sau:
 
 ### 3.1. Phương thức Cuộn Vô Tận (Incremental Infinite Fetching)
-- Sử dụng `IntersectionObserver` ở cuối trang để vắt kiệt cảm biến cuộn.
-- Bất cứ khi nào con thoi chạm đáy, Frontend tự động gửi `fetch()` gọi trang tiếp theo (`/api/images?page=X&limit=40`).
+- Sử dụng `IntersectionObserver` kết hợp cơ chế **đoán trước (Pixel Prediction)**: Kích hoạt tải dữ liệu khi người dùng còn cách đáy màn hình đúng **2500px** (`rootMargin: '2500px'`). Nhờ tải ngầm (Silent Prefetch) từ trước, người dùng không bao giờ phải chờ vòng quay Loading.
 - Khi cuộn cực nhanh, hệ thống sẽ tự động ghép nhiều luồng tải (parallel fetch) để lấy trước dữ liệu.
 
 ### 3.2. Cấu Trúc CSS Virtual Rendering (Bảo vệ CPU/RAM)
