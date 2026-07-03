@@ -25,50 +25,28 @@ Hệ thống được thiết kế hoàn toàn tự chủ, chia làm hai luồng
 Luồng này chịu trách nhiệm "vét" ảnh từ Krea.ai về làm tài sản sở hữu riêng trên Cloudflare.
 Có thể chạy bằng **Vercel Cron** (120 ảnh/lần) hoặc chạy thủ công bằng **Local Seed Script** (hàng ngàn ảnh/lần).
 
-```mermaid
-sequenceDiagram
-    participant Cron/User as Cron/Local Script
-    participant API as /api/cron/sync-krea
-    participant Krea as Krea.ai (API + CDN)
-    participant D1 as Cloudflare D1 (DB)
-    participant R2 as Cloudflare R2 (Storage)
-
-    Cron/User->>API: Kích hoạt tiến trình cào ảnh
-    API->>Krea: Gửi GET Request (Kèm Cookie mạo danh)
-    Krea-->>API: Trả về JSON chứa metadata ảnh
-    
-    loop Xử lý từng ảnh song song (Concurrency = 5)
-        API->>D1: Kiểm tra ảnh có tồn tại chưa? (Check krea_id)
-        alt Đã có trong D1
-            D1-->>API: Trả về True -> BỎ QUA (Skip)
-        else Chưa có trong D1
-            API->>Krea: Tải file ảnh nhị phân (.png) gốc
-            Krea-->>API: Buffer Data
-            API->>R2: Upload Buffer lên Bucket krea-gallery
-            R2-->>API: URL Public của ảnh
-            API->>D1: INSERT Metadata (Prompt, Kích thước, Màu, R2 URL)
-        end
-    end
-    API-->>Cron/User: Báo cáo kết quả (Synced, Skipped)
-```
+**Trình tự các bước diễn ra:**
+1. **Kích hoạt:** Lịch tự động Cron hoặc Người dùng kích hoạt file script cục bộ.
+2. **Lấy Data:** Hệ thống gửi GET Request (kèm Cookie mạo danh) lên Krea.ai và nhận về danh sách JSON chứa metadata.
+3. **Vòng lặp Xử lý (Chạy song song 5 ảnh/lần):**
+   - **Check DB:** Truy vấn Cloudflare D1 xem `krea_id` đã tồn tại chưa?
+   - **Nếu ĐÃ CÓ:** Bỏ qua ảnh này để chống lặp dữ liệu.
+   - **Nếu CHƯA CÓ:**
+     - Tải file ảnh gốc (nhị phân buffer) từ máy chủ Krea.
+     - Upload ảnh này lên Cloudflare R2 Bucket (`krea-gallery`).
+     - Insert dữ liệu (Đường link R2 Public mới, Prompt, Kích thước, Màu nền) vào Cloudflare D1.
+4. **Hoàn tất:** Báo cáo lại tổng số lượng ảnh đã đồng bộ thành công và số ảnh bị bỏ qua.
 
 ### 2.2. Luồng Trình Diễn Giao Diện (Frontend Flow)
 Luồng này phục vụ hàng triệu người dùng truy cập web xem ảnh, đọc dữ liệu hoàn toàn từ Cloudflare (không dính dáng tới Krea.ai nữa).
 
-```mermaid
-graph TD
-    Client["🖥️ Trình duyệt (Người dùng)"]
-    API_Img["⚡ Next.js API (/api/images?page=X)"]
-    D1["🗄️ Cloudflare D1"]
-    R2["📦 Cloudflare R2 CDN"]
-
-    Client -->|1. Cuộn trang gọi API lấy data| API_Img
-    API_Img -->|2. Query (OFFSET/LIMIT)| D1
-    D1 -->|3. Trả về JSON (R2 URL + Prompts)| API_Img
-    API_Img -->|4. Phản hồi JSON| Client
-    Client -->|5. Trình duyệt tự động nạp thẻ <Image>| R2
-    R2 -->|6. Trả file ảnh (Tốc độ CDN, Miễn phí Egress)| Client
-```
+**Trình tự tải giao diện:**
+1. **Trình duyệt (Người dùng)** cuộn trang xuống dưới cùng màn hình.
+2. Trình duyệt tự động gọi API phân trang nội bộ: `/api/images?page=X&limit=40`.
+3. **Next.js API** tiếp nhận và gửi câu truy vấn (Query `OFFSET/LIMIT`) vào **Cloudflare D1**.
+4. **Cloudflare D1** trả về cục dữ liệu siêu nhẹ (chỉ chứa R2 URL và các đoạn text Prompts).
+5. **Next.js API** đóng gói JSON và gửi ngược về cho Trình duyệt.
+6. Trình duyệt render các thẻ `<Image>`, sau đó trực tiếp tải file ảnh vật lý từ **Cloudflare R2 CDN** với tốc độ chớp nhoáng (Miễn phí Egress 100%).
 
 ---
 
