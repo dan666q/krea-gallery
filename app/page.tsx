@@ -57,7 +57,6 @@ export default function GalleryPage() {
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [selected, setSelected] = useState<KreaImage | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Custom states for UI feedback
   const [downloading, setDownloading] = useState<boolean>(false);
@@ -70,17 +69,14 @@ export default function GalleryPage() {
   const limit = 40;
   const [numColumns, setNumColumns] = useState<number>(4);
 
-  const filteredImages = useMemo(() => {
-    if (!searchTerm) return images;
-    const lower = searchTerm.toLowerCase();
-    return images.filter(img => img.prompt?.toLowerCase().includes(lower));
-  }, [images, searchTerm]);
+  // Lenis ref to stop/start when modal opens/closes
+  const lenisRef = useRef<Lenis | null>(null);
 
   const columns = useMemo(() => {
     const cols = Array.from({ length: numColumns }, (): KreaImage[] => []);
-    filteredImages.forEach((img, i) => cols[i % numColumns].push(img));
+    images.forEach((img, i) => cols[i % numColumns].push(img));
     return cols;
-  }, [filteredImages, numColumns]);
+  }, [images, numColumns]);
 
   // Responsive columns listener
   useEffect(() => {
@@ -113,6 +109,8 @@ export default function GalleryPage() {
       infinite: false,
     });
 
+    lenisRef.current = lenis;
+
     lenis.on('scroll', ({ scroll }: { scroll: number }) => {
       setShowBackToTop(scroll > 800);
     });
@@ -126,8 +124,18 @@ export default function GalleryPage() {
 
     return () => {
       lenis.destroy();
+      lenisRef.current = null;
     };
   }, []);
+
+  // Stop Lenis when modal is open to prevent background page scroll
+  useEffect(() => {
+    if (selected) {
+      lenisRef.current?.stop();
+    } else {
+      lenisRef.current?.start();
+    }
+  }, [selected]);
 
   // Low-level: fetch a single batch (returns raw data, no state mutations)
   const fetchBatch = useCallback(async (batchOffset: number): Promise<KreaImage[]> => {
@@ -259,19 +267,20 @@ export default function GalleryPage() {
     });
   }, []);
 
-  // Safe direct download of image bypass CORS
+  // Full-resolution download via server proxy (bypass CORS, no optimizer)
   const handleDownload = useCallback(async (url: string, id: string) => {
     if (downloading) return;
     setDownloading(true);
 
     try {
-      const response = await fetch(url);
+      const proxyUrl = `/api/image-download?url=${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
 
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `krea-${id}.png`;
+      link.download = `krea-${id}-fullres.png`;
       document.body.appendChild(link);
       link.click();
 
@@ -293,7 +302,7 @@ export default function GalleryPage() {
 
   return (
     <div className="app-layout">
-      {/* Sticky Header with Search and Stats */}
+      {/* Sticky Header */}
       <header className="header-wrapper">
         <div className="header-container">
           <div className="brand-section">
@@ -305,21 +314,8 @@ export default function GalleryPage() {
           </div>
 
           <div className="controls-section">
-            <div className="search-input-wrapper">
-              <input
-                type="text"
-                className="search-input"
-                placeholder="Tìm kiếm prompt ảnh..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <span className="search-icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              </span>
-            </div>
-
             <div className="stats-badge">
-              {filteredImages.length} / {images.length} Ảnh
+              {images.length} Ảnh
             </div>
           </div>
         </div>
@@ -347,7 +343,7 @@ export default function GalleryPage() {
 
         {!hasMore && (
           <div className="end-msg">
-            {searchTerm === '' ? '— Đã hiển thị toàn bộ kho ảnh —' : '— Đang hiển thị kết quả tìm kiếm cục bộ —'}
+            — Đã hiển thị toàn bộ kho ảnh —
           </div>
         )}
       </main>
@@ -380,17 +376,12 @@ export default function GalleryPage() {
                 <img src={selected.image_url} alt={selected.prompt || 'Detail preview'} />
               </div>
 
-              {/* Right Column: Prompt & Metadata Actions */}
-              <div className="modal-details-section">
-                <div className="modal-header-info">
-                  <h4>Original Generation</h4>
-                  <span className="image-id">ID: {selected.id}</span>
-                </div>
-
+              {/* Right Column: Prompt & Actions */}
+              <div className="modal-details-section" data-lenis-prevent>
                 {selected.prompt ? (
                   <>
-                    <h4 style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>Prompt câu lệnh</h4>
-                    <div className="prompt-box select-all">
+                    <h4 style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>Prompt</h4>
+                    <div className="prompt-box select-all" data-lenis-prevent>
                       {selected.prompt}
                     </div>
                   </>
@@ -417,7 +408,7 @@ export default function GalleryPage() {
                     disabled={downloading}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    {downloading ? 'Đang tải...' : 'Tải xuống PNG'}
+                    {downloading ? 'Đang tải...' : 'Tải Full Resolution'}
                   </button>
                 </div>
               </div>
