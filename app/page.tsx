@@ -82,6 +82,12 @@ export default function GalleryPage() {
     return cols;
   }, [images, numColumns]);
 
+  const similarColumns = useMemo(() => {
+    const cols = Array.from({ length: numColumns }, (): KreaImage[] => []);
+    similarImages.forEach((img, i) => cols[i % numColumns].push(img));
+    return cols;
+  }, [similarImages, numColumns]);
+
   // Responsive columns listener
   useEffect(() => {
     const updateColumns = () => {
@@ -452,10 +458,17 @@ export default function GalleryPage() {
                     <span>Đang tìm ảnh cùng phong cách...</span>
                   </div>
                 ) : similarImages.length > 0 ? (
-                  <div className="similar-grid">
-                    {similarImages.map((img) => (
-                      <div key={img.id} className="similar-item" onClick={() => setSelected(img)}>
-                        <img src={img.image_url} alt={img.prompt || 'Similar'} loading="lazy" />
+                  <div className="flex-masonry">
+                    {similarColumns.map((col, colIdx) => (
+                      <div key={colIdx} className="masonry-column">
+                        {col.map((img, rowIdx) => (
+                          <ImageCard
+                            key={img.id}
+                            img={img}
+                            index={rowIdx * numColumns + colIdx}
+                            onSelect={setSelected}
+                          />
+                        ))}
                       </div>
                     ))}
                   </div>
