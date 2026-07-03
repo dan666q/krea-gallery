@@ -1,5 +1,10 @@
 {
-
+  "crons": [
+    {
+      "path": "/api/cron/sync-krea",
+      "schedule": "0 */6 * * *"
+    }
+  ],
   "images": {
     "sizes": [640, 1080],
     "domains": ["gen.krea.ai", "pub-placeholder.r2.dev"],
