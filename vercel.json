@@ -1,5 +1,5 @@
 {
-  "crons": [
+  "_crons_disabled_remove_underscore_to_enable": [
     {
       "path": "/api/cron/sync-krea",
       "schedule": "0 */6 * * *"
