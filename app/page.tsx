@@ -166,8 +166,9 @@ export default function GalleryPage() {
 
   // Low-level: fetch a single batch (returns raw data, no state mutations)
   const fetchBatch = useCallback(async (batchOffset: number): Promise<KreaImage[]> => {
+    const page = Math.floor(batchOffset / limit) + 1;
     const res = await fetch(
-      `/api/k2-feed?itemOffset=${Math.floor(batchOffset)}&limit=${limit}&sort=random&bangers=true&staffPicksFirstPage=true`
+      `/api/images?page=${page}&limit=${limit}`
     );
     if (!res.ok) throw new Error(`HTTP Error Status: ${res.status}`);
     const data = await res.json();

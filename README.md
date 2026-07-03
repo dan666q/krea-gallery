@@ -90,9 +90,136 @@ interface KreaImage {
 > **Hạn chế của giải pháp Scraping trực tiếp:**
 > 1. **Rủi ro API nội bộ:** API `/api/k2-feed` của Krea có thể thay đổi cấu trúc dữ liệu JSON bất cứ lúc nào, khiến frontend bị lỗi phân tích cú pháp.
 > 2. **Ràng buộc Điều khoản (TOS):** Việc phân phối ứng dụng cào dữ liệu công khai hoặc đẩy số lượng Request cực lớn (>100.000 req/min) có thể dẫn tới rủi ro bị khóa IP theo điều khoản của nhà cung cấp.
+> 3. **Phụ thuộc CDN bên thứ 3:** Toàn bộ hình ảnh đang được serve trực tiếp từ CDN của Krea (`imagedelivery.net` / `storage.googleapis.com`). Nếu Krea thay đổi chính sách CDN hoặc xóa ảnh, gallery sẽ mất dữ liệu vĩnh viễn.
 
-### Định hướng giải quyết tương lai (Production-ready Enterprise):
-*   **Database Syncing (Cron Job):** Viết một worker chạy định kỳ để lưu trước toàn bộ thông tin/metadata của ảnh vào một Database riêng (như Supabase / PostgreSQL). Lúc đó SPA Frontend sẽ truy xuất dữ liệu từ DB cá nhân, hoàn toàn không phụ thuộc vào độ ổn định của API Krea.
+### Giải pháp: Supabase Storage Sync (Lưu trữ ảnh độc lập)
+
+Để loại bỏ sự phụ thuộc vào CDN của Krea, hệ thống áp dụng kiến trúc **Storage Sync** — đồng bộ toàn bộ ảnh và metadata sang **Supabase Storage** (Object Storage tương tự Firebase Storage / Cloudflare R2).
+
+#### 5.1. Tại sao chọn Supabase Storage?
+
+| Tiêu chí | **Supabase Storage** | Cloudflare R2 | Firebase Storage |
+| :--- | :--- | :--- | :--- |
+| **Tích hợp sẵn** | ✅ Đã có Auth trong project | ❌ Setup mới | ❌ Setup mới |
+| **Free Tier** | 1GB storage, 2GB bandwidth | 10GB, free egress | 5GB, 1GB/ngày |
+| **Chi phí/GB** | $0.021 | $0.015 | $0.026 |
+| **Egress** | $0.09/GB | **$0 miễn phí** | $0.12/GB |
+| **CDN toàn cầu** | ✅ Supabase CDN | ✅ Cloudflare | ✅ Google CDN |
+| **S3-compatible** | ✅ | ✅ | ❌ |
+| **Database cùng hệ sinh thái** | ✅ PostgreSQL tích hợp | ❌ | ❌ |
+
+> [!NOTE]
+> **Supabase Storage** được chọn vì project đã sử dụng Supabase Auth (`sb-superb-auth-token`). Việc thêm Storage Bucket không cần tạo tài khoản mới, đồng thời mở đường cho việc tích hợp Supabase PostgreSQL (lưu metadata) trong tương lai.
+
+#### 5.2. Kiến Trúc Tổng Quan (High-Level Architecture)
+
+```mermaid
+graph TB
+    subgraph "Hiện tại - Phụ thuộc Krea CDN"
+        A["🖥️ Frontend Gallery<br/>(Next.js App)"] -->|"GET /api/k2-feed"| B["⚡ API Proxy<br/>(Route Handler)"]
+        B -->|"Fetch + Cookie"| C["🌐 Krea.ai API"]
+        C -->|"JSON metadata"| B
+        B -->|"KreaImage[]"| A
+        A -->|"img src="| D["📦 Krea CDN<br/>(imagedelivery.net)"]
+    end
+
+    subgraph "Mới - Sync Script Độc Lập"
+        E["📜 sync-to-supabase.mjs<br/>(Node.js Script)"] -->|"1️⃣ GET /api/k2-feed"| B
+        E -->|"2️⃣ Download binary"| F["🔗 Image Download Proxy<br/>(/api/image-download)"]
+        F -->|"Fetch raw .png"| D
+        E -->|"3️⃣ Upload .png"| G["☁️ Supabase Storage<br/>(Bucket: krea-gallery)"]
+        E -->|"4️⃣ Save metadata"| H["📋 metadata.json<br/>(Local backup)"]
+    end
+
+    style A fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    style B fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4
+    style C fill:#1e1e2e,stroke:#f38ba8,color:#cdd6f4
+    style D fill:#1e1e2e,stroke:#f38ba8,color:#cdd6f4
+    style E fill:#1e1e2e,stroke:#fab387,color:#cdd6f4
+    style F fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4
+    style G fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    style H fill:#1e1e2e,stroke:#9399b2,color:#cdd6f4
+```
+
+#### 5.3. Luồng Xử Lý Chi Tiết (Detailed Sync Pipeline)
+
+```mermaid
+flowchart TD
+    START(["🚀 Chạy Script"]) --> INIT["Khởi tạo Supabase Client<br/>+ Đọc .env"]
+    INIT --> FETCH["📡 Gọi /api/k2-feed<br/>(batch 40 ảnh × N trang)"]
+    FETCH --> PARSE["Phân tích JSON → KreaImage[]"]
+    PARSE --> DEDUP{"🔍 Ảnh đã tồn tại<br/>trên Supabase?"}
+
+    DEDUP -->|"Đã có → Bỏ qua"| SKIP["⏭️ Skip"]
+    DEDUP -->|"Chưa có"| DOWNLOAD["⬇️ Tải binary qua<br/>/api/image-download"]
+
+    DOWNLOAD --> UPLOAD["☁️ Upload lên<br/>Supabase Storage"]
+    UPLOAD --> META["📝 Ghi metadata<br/>(id, prompt, url mới, kích thước, màu)"]
+
+    SKIP --> NEXT{"Còn batch<br/>tiếp theo?"}
+    META --> NEXT
+
+    NEXT -->|"Có"| FETCH
+    NEXT -->|"Hết"| REPORT["📊 Báo cáo kết quả<br/>(tổng ảnh, đã sync, lỗi)"]
+    REPORT --> DONE(["✅ Hoàn tất"])
+
+    style START fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4
+    style DEDUP fill:#1e1e2e,stroke:#f9e2af,color:#cdd6f4
+    style UPLOAD fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    style DONE fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4
+    style SKIP fill:#1e1e2e,stroke:#9399b2,color:#cdd6f4
+```
+
+#### 5.4. Cấu Hình Môi Trường
+
+Thêm các biến sau vào file `.env`:
+
+```bash
+# Supabase Storage Configuration
+# Lấy từ: Supabase Dashboard → Settings → API
+SUPABASE_URL=https://<project-id>.supabase.co
+SUPABASE_SERVICE_KEY=eyJ...  # service_role key (KHÔNG phải anon key)
+SUPABASE_BUCKET=krea-gallery  # Tên bucket (cần tạo trước trên Dashboard)
+```
+
+> [!IMPORTANT]
+> **Chuẩn bị trên Supabase Dashboard:**
+> 1. Vào **Storage** → **New Bucket** → Tên: `krea-gallery`, chọn **Public**
+> 2. Vào **Settings → API** → Copy `Project URL` và `service_role` key
+> 3. Dán vào file `.env` như trên
+
+#### 5.5. Sử Dụng Script Sync
+
+```bash
+# 1. Đảm bảo dev server đang chạy (script gọi API proxy qua localhost)
+npm run dev
+
+# 2. Chạy sync (trong terminal khác)
+node scripts/sync-to-supabase.mjs
+
+# 3. Tuỳ chọn: Giới hạn số lượng ảnh sync
+node scripts/sync-to-supabase.mjs --limit 500
+
+# 4. Tuỳ chọn: Chạy tự động định kỳ (cron mỗi 6 tiếng)
+# crontab: 0 */6 * * * cd /path/to/project && node scripts/sync-to-supabase.mjs
+```
+
+#### 5.6. Cấu Trúc Dữ Liệu Sau Sync
+
+```
+Supabase Storage (Bucket: krea-gallery)
+├── images/
+│   ├── <uuid-1>.png          ← Ảnh gốc full-resolution
+│   ├── <uuid-2>.png
+│   └── ...
+└── (metadata lưu trong metadata.json hoặc Supabase PostgreSQL)
+
+URL công khai:
+https://<project>.supabase.co/storage/v1/object/public/krea-gallery/images/<uuid>.png
+```
+
+> [!TIP]
+> **Mở rộng trong tương lai:** Khi đã có ảnh trên Supabase Storage, có thể chuyển Frontend sang đọc từ Supabase CDN thay vì Krea CDN. Chỉ cần thay `image_url` trong response của API proxy — **không cần sửa bất kỳ component nào trên Frontend**.
 
 ---
 
