@@ -186,6 +186,13 @@ export default function GalleryPage() {
           seenIds.current.add(img.id);
           return true;
         });
+        
+        // Giải pháp A: Xóc bài (Shuffle) trên Frontend trước khi đưa vào Grid
+        for (let i = uniqueNew.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [uniqueNew[i], uniqueNew[j]] = [uniqueNew[j], uniqueNew[i]];
+        }
+        
         if (uniqueNew.length > 0) setImages(prev => [...prev, ...uniqueNew]);
       })
       .catch(() => { })
@@ -214,6 +221,12 @@ export default function GalleryPage() {
             seenIds.current.add(img.id);
             return true;
           });
+
+          // Giải pháp A: Xóc bài (Shuffle) trên Frontend trước khi đưa vào Grid
+          for (let i = uniqueNew.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [uniqueNew[i], uniqueNew[j]] = [uniqueNew[j], uniqueNew[i]];
+          }
 
           setImages(prev => [...prev, ...uniqueNew]);
 
