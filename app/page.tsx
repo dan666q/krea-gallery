@@ -73,7 +73,6 @@ export default function GalleryPage() {
 
   const limit = 40;
   const [numColumns, setNumColumns] = useState<number>(4);
-  const SIMILAR_COLS = 2;
 
   // Lenis ref to stop/start when modal opens/closes
   const lenisRef = useRef<Lenis | null>(null);
@@ -85,10 +84,10 @@ export default function GalleryPage() {
   }, [images, numColumns]);
 
   const similarColumns = useMemo(() => {
-    const cols = Array.from({ length: SIMILAR_COLS }, (): KreaImage[] => []);
-    similarImages.forEach((img, i) => cols[i % SIMILAR_COLS].push(img));
+    const cols = Array.from({ length: numColumns }, (): KreaImage[] => []);
+    similarImages.forEach((img, i) => cols[i % numColumns].push(img));
     return cols;
-  }, [similarImages]);
+  }, [similarImages, numColumns]);
 
   // Responsive columns listener
   useEffect(() => {
@@ -471,7 +470,7 @@ export default function GalleryPage() {
                           <ImageCard
                             key={img.id}
                             img={img}
-                            index={rowIdx * SIMILAR_COLS + colIdx}
+                            index={rowIdx * numColumns + colIdx}
                             onSelect={setSelected}
                           />
                         ))}

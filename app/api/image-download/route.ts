@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   try {
     const headers: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      'Accept': '*/*', // DO NOT ask for image/webp or image/avif to avoid CDN optimization
       'Referer': 'https://www.krea.ai/',
     };
 
@@ -53,7 +53,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const contentType = response.headers.get('content-type') || 'image/webp';
+    // Keep original content-type if provided by CDN, otherwise fallback to generic
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
 
     return new NextResponse(response.body, {
       status: 200,
