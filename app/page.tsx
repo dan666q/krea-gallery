@@ -62,7 +62,7 @@ export default function GalleryPage() {
   const [downloading, setDownloading] = useState<boolean>(false);
   const [showToast, setShowToast] = useState<boolean>(false);
   const [showBackToTop, setShowBackToTop] = useState<boolean>(false);
-  
+
   // Similar images states
   const [similarImages, setSimilarImages] = useState<KreaImage[]>([]);
   const [loadingSimilar, setLoadingSimilar] = useState<boolean>(false);
@@ -154,10 +154,10 @@ export default function GalleryPage() {
       setSimilarImages([]);
       return;
     }
-    
+
     setLoadingSimilar(true);
     setSimilarImages([]);
-    
+
     fetch(`/api/k2-similar?id=${selected.id}`)
       .then(res => res.json())
       .then(data => {
@@ -192,7 +192,7 @@ export default function GalleryPage() {
         });
         if (uniqueNew.length > 0) setImages(prev => [...prev, ...uniqueNew]);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => { prefetchingRef.current = false; });
   }, [fetchBatch]);
 
@@ -348,12 +348,6 @@ export default function GalleryPage() {
               <p className="brand-subtitle">Powered by Krea.ai & Vercel Serverless</p>
             </div>
           </div>
-
-          <div className="controls-section">
-            <div className="stats-badge">
-              {images.length} Ảnh
-            </div>
-          </div>
         </div>
       </header>
 
@@ -412,7 +406,7 @@ export default function GalleryPage() {
                 <div className="modal-image-section">
                   <img src={selected.image_url} alt={selected.prompt || 'Detail preview'} />
                 </div>
-  
+
                 {/* Right Column: Prompt & Actions */}
                 <div className="modal-details-section">
                   {selected.prompt ? (
@@ -427,7 +421,7 @@ export default function GalleryPage() {
                       Không tìm thấy dữ liệu prompt cho ảnh này.
                     </p>
                   )}
-  
+
                   <div className="action-buttons">
                     {selected.prompt && (
                       <button
@@ -438,19 +432,19 @@ export default function GalleryPage() {
                         Copy Prompt
                       </button>
                     )}
-  
+
                     <button
                       className="btn btn-primary"
                       onClick={() => handleDownload(selected.image_url, selected.id)}
                       disabled={downloading}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                      {downloading ? 'Đang tải...' : 'Tải Full Resolution'}
+                      {downloading ? 'Đang tải...' : 'Download'}
                     </button>
                   </div>
                 </div>
               </div>
-              
+
               {/* Similar Images Section */}
               <div className="similar-section">
                 <h3 className="similar-title">Ảnh tương tự</h3>
