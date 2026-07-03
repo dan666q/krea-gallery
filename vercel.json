@@ -1,7 +1,8 @@
 {
+
   "images": {
     "sizes": [640, 1080],
-    "domains": ["gen.krea.ai"],
+    "domains": ["gen.krea.ai", "pub-placeholder.r2.dev"],
     "formats": ["image/avif", "image/webp"]
   }
 }

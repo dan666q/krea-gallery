@@ -9,7 +9,11 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'images.weserv.nl',
-      }
+      },
+      {
+        protocol: 'https',
+        hostname: '*.r2.dev',
+      },
     ],
   },
 };
