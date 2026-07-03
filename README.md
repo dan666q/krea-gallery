@@ -56,7 +56,7 @@ Luồng này phục vụ hàng triệu người dùng truy cập web xem ảnh, 
 
 ### 3.1. Phương thức Cuộn Vô Tận (Incremental Infinite Fetching)
 - Sử dụng `IntersectionObserver` kết hợp cơ chế **đoán trước (Pixel Prediction)**: Kích hoạt tải dữ liệu khi người dùng còn cách đáy màn hình đúng **2500px** (`rootMargin: '2500px'`). Nhờ tải ngầm (Silent Prefetch) từ trước, người dùng không bao giờ phải chờ vòng quay Loading.
-- Khi cuộn cực nhanh, hệ thống sẽ tự động ghép nhiều luồng tải (parallel fetch) để lấy trước dữ liệu.
+- **Nâng cấp Tải Song Song (Streaming Parallel Fetch):** Thay vì tải từng trang tuần tự (Page 1 -> Page 2), hệ thống được thiết kế để đếm tốc độ cuộn. Nếu người dùng cuộn quá nhanh, nó sẽ ghép nhiều luồng (ví dụ: Tải cùng lúc Page 3, Page 4, Page 5). Đặc biệt, hệ thống áp dụng kỹ thuật **Streaming State Update**: Luồng nào tải xong trước sẽ nhét thẳng ảnh vào giao diện ngay lập tức mà không cần chờ các luồng còn lại (`Promise.all` chỉ dùng để mở khóa cờ Loading).
 
 ### 3.2. Cấu Trúc CSS Virtual Rendering (Bảo vệ CPU/RAM)
 - Việc giữ hàng ngàn thẻ `<img>` trên HTML DOM sẽ làm máy tính yếu bị treo. 
