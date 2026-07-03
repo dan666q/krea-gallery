@@ -25,7 +25,7 @@ const ImageCard = memo(({ img, index, onSelect }: { img: KreaImage; index: numbe
         e.preventDefault();
         onSelect(img);
       }}
-      title={img.prompt || 'Krea Image'}
+      title=""
     >
       <div className="image-card-wrapper" style={{ position: 'relative', backgroundColor: img.color || '#1a1a1a' }}>
         <Image
@@ -39,11 +39,6 @@ const ImageCard = memo(({ img, index, onSelect }: { img: KreaImage; index: numbe
           priority={index < 12}
           style={{ width: '100%', height: 'auto', display: 'block' }}
         />
-        {img.prompt && (
-          <div className="prompt-overlay">
-            <p className="prompt-text-overlay">{img.prompt}</p>
-          </div>
-        )}
       </div>
     </a>
   );
@@ -345,7 +340,7 @@ export default function GalleryPage() {
             <div className="brand-logo">K</div>
             <div>
               <h1 className="brand-title">Infinity Gallery</h1>
-              <p className="brand-subtitle">Powered by Krea.ai & Vercel Serverless</p>
+              <p className="brand-subtitle">Powered by Krea.ai</p>
             </div>
           </div>
         </div>
